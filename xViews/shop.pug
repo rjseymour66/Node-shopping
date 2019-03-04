@@ -1,0 +1,22 @@
+extends layouts/main-layout.pug
+
+block styles
+	link(rel="stylesheet", href="/css/product.css")
+
+block content
+	main
+		if prods.length > 0
+			.grid
+				each product in prods
+					article.card.product-item
+						header.card__header
+							h1.product__title #{product.title}
+						div.card__image
+							img(src="http://www.usp.ac.fj/studyskills/CFDL/module1/Know-about-information/Types-of-information/Book-Chapter/mainParagraphs/00/image/red%20book%20white%20background.jpg", alt="A Book")
+						div.card__content
+							h2.product__price $19.99
+							p.product__description A very interesting book about so many even more interesting things!
+						.card__actions
+							button.btn Add to Cart
+		else
+			h1 No Products
