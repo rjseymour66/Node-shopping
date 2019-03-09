@@ -15,17 +15,17 @@ exports.postAddProduct = (req, res, next) => {
   const description = req.body.description;
   const product = new Product({
     title: title,
-    price: price, 
-    description: description, 
+    price: price,
+    description: description,
     imageUrl: imageUrl,
     userId: req.user
   });
   product
     .save()
     .then(result => {
-    console.log('**Product created**');
-    res.redirect('/admin/products')
-  })
+      console.log('**Product created**');
+      res.redirect('/admin/products')
+    })
     .catch(err => console.log(err));
 }
 
@@ -37,7 +37,7 @@ exports.getEditProduct = (req, res, next) => {
   const prodId = req.params.productId;
   Product.findById(prodId)
     .then(product => {
-      if(!product) {
+      if (!product) {
         return res.redirect('/')
       }
       res.render('admin/edit-product', {
@@ -58,16 +58,19 @@ exports.postEditProduct = (req, res, next) => {
   const updatedDesc = req.body.description;
 
   Product.findById(prodId)
-  .then(product => {
-    product.title = updatedTitle;
-    product.price = updatedPrice;
-    product.imageUrl = updatedImageUrl;
-    product.description = updatedDesc;
-    return product.save()
-  })
-    .then(result => {
-      console.log('**Updated product**');
-      res.redirect('/admin/products')
+    .then(product => {
+      if (product.userId.toString() !== req.user._id.toString() ) {
+        return res.redirect('/');
+      }
+      product.title = updatedTitle;
+      product.price = updatedPrice;
+      product.imageUrl = updatedImageUrl;
+      product.description = updatedDesc;
+      return product.save()
+        .then(result => {
+          console.log('**Updated product**');
+          res.redirect('/admin/products')
+        })
     })
     .catch(err => {
       console.log(err);
@@ -75,9 +78,9 @@ exports.postEditProduct = (req, res, next) => {
 }
 
 exports.getProducts = (req, res, next) => {
-  Product.find()
-  // .select('title price -_id')  **THIS IS IMPORTANT**
-  // .populate('userId', 'name')  **THIS IS IMPORTANT**
+  Product.find({ userId: req.user._id }) // only edit products you use
+    // .select('title price -_id')  **THIS IS IMPORTANT**
+    // .populate('userId', 'name')  **THIS IS IMPORTANT**
     .then(products => {
       console.log(products);
       res.render('admin/products', {
@@ -91,7 +94,7 @@ exports.getProducts = (req, res, next) => {
 
 exports.postDeleteProduct = (req, res, next) => {
   const prodId = req.body.productId;
-  Product.findByIdAndRemove(prodId)
+  Product.deleteOne({ _id: prodId, userId: req.use._id }) // can't delete products that aren't added by you
     .then(() => {
       console.log('**Deleted product**');
       res.redirect('/admin/products')
