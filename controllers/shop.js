@@ -6,6 +6,10 @@ const PDFDocument = require('pdfkit');
 const Product = require('../models/product');
 const Order = require('../models/order');
 
+// Set your secret key: remember to change this to your live secret key in production
+// See your keys here: https://dashboard.stripe.com/account/apikeys
+const stripe = require("stripe")(process.env.STRIPE_TEST_KEY);
+
 const ITEMS_PER_PAGE = 2;
 
 
@@ -140,11 +144,44 @@ exports.postCartDeleteProduct = (req, res, next) => {
     });
 };
 
-exports.postOrder = (req, res, next) => {
+exports.getCheckout = (req, res, next) => {
   req.user
     .populate('cart.items.productId')
     .execPopulate()
     .then(user => {
+      const products = user.cart.items;
+      let total = 0;
+      products.forEach(p => {
+        total += p.quantity * p.productId.price
+      })
+      res.render('shop/checkout', {
+        path: '/checkout',
+        pageTitle: 'Checkout',
+        products: products,
+        totalSum: total
+      });
+    })
+    .catch(err => {
+      const error = new Error(err);
+      error.httpStatusCode = 500;
+      return next(error);
+    });
+}
+
+exports.postOrder = (req, res, next) => {
+  // Token is created using Checkout or Elements!
+  // Get the payment token ID submitted by the form:
+  const token = req.body.stripeToken; // Using Express
+  let totalSum = 0;
+
+  req.user
+    .populate('cart.items.productId')
+    .execPopulate()
+    .then(user => {
+      user.cart.items.forEach(p => {
+        totalSum += p.quantity * p.productId.price;
+      });
+
       const products = user.cart.items.map(i => {
         return { quantity: i.quantity, product: { ...i.productId._doc } };
       });
@@ -158,6 +195,13 @@ exports.postOrder = (req, res, next) => {
       return order.save();
     })
     .then(result => {
+      const charge = stripe.charges.create({
+        amount: totalSum * 100,
+        currency: 'usd',
+        description: 'Fake Order',
+        source: token,
+        metadata: {order_id: result._id.toString()}
+      });
       return req.user.clearCart();
     })
     .then(() => {
@@ -194,7 +238,7 @@ exports.getInvoice = (req, res, next) => {
         return next(new Error('No order found.'));
       }
       if (order.user.userId.toString() !== req.user._id.toString()) {
-        return next(new Error('Unauthorized.'));
+        return next(new Error('Unauthorized'));
       }
       const invoiceName = 'invoice-' + orderId + '.pdf';
       const invoicePath = path.join('data', 'invoices', invoiceName);
